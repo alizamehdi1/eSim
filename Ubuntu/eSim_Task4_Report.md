@@ -31,6 +31,8 @@ All **8 issues** encountered during the initial installation and subsequent rein
 
 * **Operating System:** Ubuntu 25.04 (`plucky`, 64-bit) running on Oracle VirtualBox (8 GB RAM, 4 vCPUs, 60 GB disk) — verified via `lsb_release -a`.
 
+  ![Ubuntu 25.04 Plucky Environment](screenshots/Screenshot%202026-11-20%20160538.png)
+
 * **eSim Version:** eSim 2.5 (`installers` branch)
 
 * **Technologies Used:** Bash Scripting, Python, eSim, KiCad, NGHDL/GHDL, LLVM, Git, `apt`
@@ -63,6 +65,8 @@ All **8 issues** encountered during the initial installation and subsequent rein
   Unsupported Ubuntu version: 25.04 ()
   ```
 
+  ![Unsupported Ubuntu Version Error](screenshots/Environment%20issue%20-esim2.5%20install.png)
+
 * **Root Cause:**
 
   `install-eSim.sh` checks `$VERSION_ID` from `/etc/os-release` against a hardcoded `case` block that only supports `22.04`, `23.04`, and `24.04`. Ubuntu `25.04` hits the default `*)` branch and exits immediately.
@@ -80,6 +84,8 @@ All **8 issues** encountered during the initial installation and subsequent rein
      ```
 
 * **Verification:** `install-eSim.sh` detects `25.04` and launches `install-eSim-scripts/install-eSim-25.04.sh`.
+
+  ![Installer Running on Ubuntu 25.04](screenshots/NGHDL.png)
 
 ### Issue 2: KiCad Installation Fails Due to Unsupported PPA (`404 Not Found`)
 
@@ -147,6 +153,8 @@ All **8 issues** encountered during the initial installation and subsequent rein
 
 * **Verification:** `install-nghdl.sh` recognizes Ubuntu `25.04` and runs `install-nghdl-25.04.sh`.
 
+  ![Patched NGHDL 25.04 Script Execution](screenshots/Resolution%20of%20NGHDL%20package%20error.png)
+
 ### Issue 4: Missing Package `libcanberra-gtk-module` During NGHDL Setup
 
 * **Error Observed:**
@@ -192,6 +200,8 @@ All **8 issues** encountered during the initial installation and subsequent rein
   Updated `installNghdl` in `install-eSim-25.04.sh` to install `llvm-18` and `llvm-18-dev` if not present, detect the available LLVM 18 binary (`/usr/bin/llvm-config-18` or `/usr/lib/llvm-18/bin/llvm-config`), and update `--with-llvm-config=` in `install-nghdl-25.04.sh` automatically during execution.
 
 * **Verification:** GHDL 4.1.0 moves past the LLVM 20 rejection and uses LLVM 18 during configuration.
+
+  ![GHDL 4.1.0 LLVM Dependency Step](screenshots/NGHDL%20OUTPUT%20SS.png)
 
 ### Issue 6: (During Reinstallation) Repeated Path Patching Produces `/usr/bin/llvm-config-18-18` in GHDL `./configure`
 
@@ -374,6 +384,10 @@ PY
 
 * **Installation Result:** Completed with `-----------------eSim Installed Successfully-----------------` after Ngspice, NGHDL, SKY130 PDK, and desktop/menu shortcuts were set up.
 
+  ![eSim 2.5 Terminal Installation Success and Launch](screenshots/Esim%20successful%20installation.png)
+
 * **Application Launch & GUI:** Running `esim` (lowercase `esim` rather than `eSim`) starts eSim 2.5, initializes `/home/aliza-mehdi/eSim-Workspace`, and opens the **eSim-2.5** GUI window along with the Desktop launcher icon.
+
+  ![eSim 2.5 GUI Window on Ubuntu 25.04](screenshots/Esim%20installed%20succesfully.png)
 
 * **Repository & Branch:** All updated installer scripts (`install-eSim.sh` and `install-eSim-scripts/install-eSim-25.04.sh`) are committed to the `installers` branch of https://github.com/alizamehdi1/eSim.
