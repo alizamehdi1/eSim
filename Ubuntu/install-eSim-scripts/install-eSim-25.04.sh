@@ -58,28 +58,60 @@ function createConfigFile
    
 }
 
-
 function installNghdl
 {
 
     echo "Installing NGHDL..........................."
+
     unzip -o nghdl.zip
     cd nghdl/
-    chmod +x install-nghdl.sh
 
-    # Do not trap on error of any command. Let NGHDL script handle its own errors.
+    # Only generate 25.04 from 24.04 if 25.04 does not already exist
+    if [ ! -f install-nghdl-scripts/install-nghdl-25.04.sh ] && [ -f install-nghdl-scripts/install-nghdl-24.04.sh ]; then
+        cp install-nghdl-scripts/install-nghdl-24.04.sh install-nghdl-scripts/install-nghdl-25.04.sh
+    fi
+
+    if [ -f install-nghdl-scripts/install-nghdl-25.04.sh ]; then
+        # Replace removed GTK2 libcanberra-gtk-module with libcanberra-gtk3-module on Ubuntu 25.04
+        sed -i 's/\blibcanberra-gtk-module\b/libcanberra-gtk3-module/g' install-nghdl-scripts/install-nghdl-25.04.sh
+
+        # Ensure llvm-18 is available and point GHDL configure to llvm-config-18 instead of LLVM 20
+        if [ ! -x /usr/bin/llvm-config-18 ] && [ ! -x /usr/lib/llvm-18/bin/llvm-config ]; then
+            sudo apt-get update && sudo apt-get install -y llvm-18 llvm-18-dev
+        fi
+
+        if [ -x /usr/bin/llvm-config-18 ]; then
+            sed -i 's|--with-llvm-config=/usr/bin/llvm-config|--with-llvm-config=/usr/bin/llvm-config-18|g' install-nghdl-scripts/install-nghdl-25.04.sh
+        elif [ -x /usr/lib/llvm-18/bin/llvm-config ]; then
+            sed -i 's|--with-llvm-config=/usr/bin/llvm-config|--with-llvm-config=/usr/lib/llvm-18/bin/llvm-config|g' install-nghdl-scripts/install-nghdl-25.04.sh
+        fi
+    fi
+
+    if ! grep -q '"25\.04")' install-nghdl.sh; then
+        awk '
+            /"24\.04"\)/ { found24 = 1 }
+            found24 && /^[[:space:]]*;;/ {
+                print
+                print "    \"25.04\")"
+                print "        SCRIPT=\"$SCRIPT_DIR/install-nghdl-25.04.sh\""
+                print "        ;;"
+                found24 = 0
+                next
+            }
+            { print }
+        ' install-nghdl.sh > install-nghdl.sh.tmp && mv install-nghdl.sh.tmp install-nghdl.sh
+    fi
+
+    chmod +x install-nghdl.sh install-nghdl-scripts/install-nghdl-25.04.sh 2>/dev/null
+
     trap "" ERR
-
-    ./install-nghdl.sh --install       # Install NGHDL
-        
-    # Set trap again to error_exit function to exit on errors
+    ./install-nghdl.sh --install
     trap error_exit ERR
 
     ngspiceFlag=1
     cd ../
 
 }
-
 
 function installSky130Pdk
 {
@@ -112,8 +144,8 @@ function installKicad
     ubuntu_version=$(lsb_release -rs)
 
     # Define KiCad PPAs based on Ubuntu version
-    if [[ "$ubuntu_version" == "24.04" || "$ubuntu_version" == "25.04" ]]; then
-        echo "Ubuntu $ubuntu_version detected."
+    if [[ "$ubuntu_version" == "24.04" ]]; then
+        echo "Ubuntu 24.04 detected."
         kicadppa="kicad/kicad-8.0-releases"
 
         # Check if KiCad is installed using dpkg-query for the main package
@@ -138,11 +170,11 @@ function installKicad
         fi
 
     else
-        kicadppa="kicad/kicad-6.0-releases"
+        kicadppa=""
     fi
 
     # Check if the PPA is already added
-    if ! grep -q "^deb .*${kicadppa}" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
+    if [ -n "$kicadppa" ] && ! grep -q "^deb .*${kicadppa}" /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
         echo "Adding KiCad PPA to local apt repository: $kicadppa"
         sudo add-apt-repository -y "ppa:$kicadppa"
         sudo apt-get update
@@ -151,7 +183,7 @@ function installKicad
     fi
 
     # Install KiCad packages
-    sudo apt-get install -y --no-install-recommends kicad=8.0.8+dfsg-1 kicad-footprints kicad-libraries kicad-symbols kicad-templates
+    sudo apt-get install -y --no-install-recommends kicad kicad-footprints kicad-libraries kicad-symbols kicad-templates
 
     echo "KiCad installation completed successfully!"
 }
@@ -231,15 +263,15 @@ function copyKicadLibrary
     #Extract custom KiCad Library
     tar -xJf library/kicadLibrary.tar.xz
 
-    if [ -d ~/.config/kicad/6.0 ];then
+    if [ -d ~/.config/kicad/8.0 ];then
         echo "kicad config folder already exists"
     else 
-        echo ".config/kicad/6.0 does not exist"
-        mkdir -p ~/.config/kicad/6.0
+        echo ".config/kicad/8.0 does not exist"
+        mkdir -p ~/.config/kicad/8.0
     fi
 
     # Copy symbol table for eSim custom symbols 
-    cp kicadLibrary/template/sym-lib-table ~/.config/kicad/6.0/
+    cp kicadLibrary/template/sym-lib-table ~/.config/kicad/8.0/
     echo "symbol table copied in the directory"
 
     # Copy KiCad symbols made for eSim
@@ -417,7 +449,7 @@ elif [ $option == "--uninstall" ];then
         sudo apt purge -y kicad kicad-footprints kicad-libraries kicad-symbols kicad-templates
         sudo rm -rf /usr/share/kicad
 	sudo rm /etc/apt/sources.list.d/kicad*
-        rm -rf $HOME/.config/kicad/6.0
+        rm -rf $HOME/.config/kicad/8.0
 
         echo "Removing Virtual env......................."
         sudo rm -r $config_dir/env
