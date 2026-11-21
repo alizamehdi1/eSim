@@ -64,7 +64,7 @@ function installNghdl
     echo "Installing NGHDL..........................."
 
     unzip -o nghdl.zip
-    cd nghdl/
+    cd nghdl/ || return 1
 
     # Only generate 25.04 from 24.04 if 25.04 does not already exist
     if [ ! -f install-nghdl-scripts/install-nghdl-25.04.sh ] && [ -f install-nghdl-scripts/install-nghdl-24.04.sh ]; then
@@ -80,10 +80,26 @@ function installNghdl
             sudo apt-get update && sudo apt-get install -y llvm-18 llvm-18-dev
         fi
 
+        LLVM_BIN=""
         if [ -x /usr/bin/llvm-config-18 ]; then
-            sed -i 's|--with-llvm-config=/usr/bin/llvm-config|--with-llvm-config=/usr/bin/llvm-config-18|g' install-nghdl-scripts/install-nghdl-25.04.sh
+            LLVM_BIN="/usr/bin/llvm-config-18"
         elif [ -x /usr/lib/llvm-18/bin/llvm-config ]; then
-            sed -i 's|--with-llvm-config=/usr/bin/llvm-config|--with-llvm-config=/usr/lib/llvm-18/bin/llvm-config|g' install-nghdl-scripts/install-nghdl-25.04.sh
+            LLVM_BIN="/usr/lib/llvm-18/bin/llvm-config"
+        fi
+
+        if [ -n "$LLVM_BIN" ]; then
+            python3 - "$LLVM_BIN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+llvm_bin = sys.argv[1]
+p = Path("install-nghdl-scripts/install-nghdl-25.04.sh")
+text = p.read_text(encoding="utf-8")
+text = re.sub(r"llvm-config-18(?:-18)+", "llvm-config-18", text)
+text = re.sub(r"(--with-llvm-config=)\S+", rf"\g<1>{llvm_bin}", text)
+p.write_text(text, encoding="utf-8")
+PY
         fi
     fi
 
@@ -101,6 +117,10 @@ function installNghdl
             { print }
         ' install-nghdl.sh > install-nghdl.sh.tmp && mv install-nghdl.sh.tmp install-nghdl.sh
     fi
+
+    # Remove leftover GHDL build/ALI artifacts from interrupted runs so mv never prompts
+    rm -rf ghdl-4.1.0 2>/dev/null || true
+    unalias mv 2>/dev/null || true
 
     chmod +x install-nghdl.sh install-nghdl-scripts/install-nghdl-25.04.sh 2>/dev/null
 
